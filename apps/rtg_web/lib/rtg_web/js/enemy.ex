@@ -28,12 +28,21 @@ defmodule RtgWeb.Js.Enemy do
       current: current,
       prev: current,
       dest: current,
-      anim: %{start: 0, end: 0}
+      anim: %{start: 0, end: 0},
+      hp: 100
     }
 
     GameChannel.on("move_to", fn msg, _, _ ->
       msg = JS.object_to_map(msg)
       Gen2D.cast(canvas.__id__, id(), {:move_to, msg.dest, msg.anim_end})
+    end)
+
+    GameChannel.on("damage", fn msg, _, _ ->
+      msg = JS.object_to_map(msg)
+
+      if msg.user == :enemy do
+        state = %{state | hp: msg.player.hp}
+      end
     end)
 
     {:ok, state}
@@ -42,7 +51,14 @@ defmodule RtgWeb.Js.Enemy do
   @impl Gen2D
   def handle_cast({:move_to, dest, anim_end}, state) do
     now = Date.now()
-    state = %{state | prev: state.current, dest: dest, anim: %{start: now, end: anim_end}}
+
+    state = %{
+      state
+      | prev: state.current,
+        dest: dest,
+        anim: %{start: now, end: anim_end}
+    }
+
     {:ok, state}
   end
 
@@ -52,6 +68,15 @@ defmodule RtgWeb.Js.Enemy do
     Canvas.set(canvas, "strokeStyle", "#F33")
     canvas.context.beginPath()
     canvas.context.arc(state.current.x, state.current.y, @radius, 0, @pi * 2)
+    Canvas.set(canvas, "fillStyle", "#F33")
+    Canvas.set(canvas, "font", "30px 'Times New Roman'")
+
+    canvas.context.fillText(
+      "HP: " <> state.hp.toString() <> "/100",
+      state.current.x - @radius,
+      state.current.y - @radius - 10
+    )
+
     canvas.context.stroke()
     {:ok, state}
   end

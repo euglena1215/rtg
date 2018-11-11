@@ -33,6 +33,9 @@ defmodule RtgWeb.Game do
   def move_to(id, player, dest, anim_end),
     do: GenServer.cast(worker_name(id), {:move_to, player, dest, anim_end})
 
+  def damage(id, player, damage_point),
+    do: GenServer.cast(worker_name(id), {:damage, player, damage_point})
+
   @spec worker_name(Worker.id()) :: GenServer.name()
   def worker_name(id), do: {:via, Registry, {Game.Registry, id}}
 end

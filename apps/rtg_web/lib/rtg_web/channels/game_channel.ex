@@ -8,7 +8,7 @@ defmodule RtgWeb.GameChannel do
 
   use RtgWeb, :channel
 
-  intercept(["move_to"])
+  intercept(["move_to", "damage"])
 
   @impl Channel
   def join("game:" <> game_id, payload, socket) do
@@ -30,6 +30,13 @@ defmodule RtgWeb.GameChannel do
   end
 
   @impl Channel
+  def handle_in("damage", payload, socket) do
+    damage_point = payload["damage_point"]
+    Game.damage(socket.assigns.game_id, socket.assigns.player, damage_point)
+    {:noreply, socket}
+  end
+
+  @impl Channel
   def handle_info(:after_join, socket) do
     Game.join(socket.assigns.game_id, socket.assigns.player)
     {:noreply, socket}
@@ -45,6 +52,19 @@ defmodule RtgWeb.GameChannel do
       msg = Map.delete(payload, :player)
       Logger.debug(inspect({:out, socket.topic, "move_to", msg}))
       push(socket, "move_to", msg)
+    end
+
+    {:noreply, socket}
+  end
+
+  def handle_out("damage", payload, socket) do
+    player = payload.player |> Base.decode64!() |> :erlang.binary_to_term()
+    Logger.debug(inspect({:out, socket.topic, "damage", payload}))
+
+    if player.pid == self() do
+      push(socket, "damage", %{payload | user: :player})
+    else
+      push(socket, "damage", %{payload | user: :enemy})
     end
 
     {:noreply, socket}

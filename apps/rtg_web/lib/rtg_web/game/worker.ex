@@ -10,7 +10,7 @@ defmodule RtgWeb.Game.Worker do
 
   @type id :: binary
 
-  @type player :: %{pid: pid, monitor: reference}
+  @type player :: %{pid: pid, monitor: reference, hp: integer}
 
   @type t :: %{id: id, players: [player]}
 
@@ -26,6 +26,7 @@ defmodule RtgWeb.Game.Worker do
   def handle_cast({:join, player}, state) do
     Logger.debug(inspect({__MODULE__, :join, player}))
     player = put_in(player[:monitor], Process.monitor(player.pid))
+    player = put_in(player[:hp], 100)
     state = if started?(state), do: state, else: update_in(state.players, &[player | &1])
     {:noreply, state}
   end
@@ -37,6 +38,31 @@ defmodule RtgWeb.Game.Worker do
       player: player |> :erlang.term_to_binary([:compressed]) |> Base.encode64(),
       dest: %{x: x, y: y},
       anim_end: anim_end
+    })
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:damage, player, damage_point}, state) do
+    Logger.debug(inspect({__MODULE__, :damage, player, damage_point}))
+
+    state =
+      Map.update!(state, :players, fn players ->
+        for player_ <- players do
+          if player_.pid == player.pid do
+            %{player_ | hp: player_.hp - 10}
+          else
+            player_
+          end
+        end
+      end)
+
+    Endpoint.broadcast!("game:" <> state.id, "damage", %{
+      player:
+        Enum.filter(state.players, fn player_ -> player_.pid == player.pid end)
+        |> Enum.at(0)
+        |> :erlang.term_to_binary([:compressed])
+        |> Base.encode64()
     })
 
     {:noreply, state}

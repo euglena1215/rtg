@@ -33,8 +33,17 @@ defmodule RtgWeb.Js.Player do
       current: current,
       prev: current,
       dest: current,
-      anim: %{start: 0, end: 0}
+      anim: %{start: 0, end: 0},
+      hp: 100
     }
+
+    GameChannel.on("damage", fn msg, _, _ ->
+      msg = JS.object_to_map(msg)
+
+      if msg.user == :player do
+        state = %{state | hp: msg.player.hp}
+      end
+    end)
 
     {:ok, state}
   end
@@ -56,16 +65,36 @@ defmodule RtgWeb.Js.Player do
       "anim_end" => anim_end
     })
 
-    state = %{state | prev: state.current, dest: point, anim: %{start: now, end: anim_end}}
+    GameChannel.push("damage", %{
+      "damage_point" => 10
+    })
+
+    state = %{
+      state
+      | prev: state.current,
+        dest: point,
+        anim: %{start: now, end: anim_end}
+    }
+
     {:ok, state}
   end
 
   @impl Gen2D
   def handle_frame(canvas, state) do
     state = next(state)
-    Canvas.set(canvas, "strokeStyle", "#FFF")
+    Canvas.set(canvas, "strokeStyle", "#8CF")
     canvas.context.beginPath()
     canvas.context.arc(state.current.x, state.current.y, @radius, 0, @pi * 2)
+
+    Canvas.set(canvas, "fillStyle", "#8CF")
+    Canvas.set(canvas, "font", "30px 'Times New Roman'")
+
+    canvas.context.fillText(
+      "HP: " <> state.hp.toString() <> "/100",
+      state.current.x - @radius,
+      state.current.y - @radius - 10
+    )
+
     canvas.context.stroke()
     {:ok, state}
   end
